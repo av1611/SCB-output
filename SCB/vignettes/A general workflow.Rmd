@@ -1,0 +1,187 @@
+---
+title: "A general workflow"
+author: "Alexis Gaevsky"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Vignette Title}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+Vignettes are long form documentation commonly included in packages. Because they are part of the distribution of the package, they need to be as compact as possible. The `html_vignette` output type provides a custom style sheet (and tweaks some options) to ensure that the resulting html is as small as possible. The `html_vignette` format:
+
+- Never uses retina figures
+- Has a smaller default figure size
+- Uses a custom CSS stylesheet instead of the default Twitter Bootstrap style
+
+## Starting out
+Creating an object of parameters as as list
+
+
+```{r}
+scbParams <- list(tParCount = 10,
+                  sampleSize = 10,
+                  mean = 0,
+                  sd = 1,
+                  kernel = normalDifferenceKernel,
+                  u = seq(-10, 10, 0.1),
+                  lag = 2,
+                  nonCoverageProbability = 0.05,
+                  c_k = -1.978325,
+                  phi_k_norm_diff = 0.4065,
+                  alphaCount = 10,
+                  replicationCount = 10,
+                  superReplicationCount = 10,
+                  bwidth = 1)
+
+
+```
+
+Calling functions
+```{r}
+library(SCB)
+doAll <- function(scbParams) {
+  scb <- list()
+  scb$tParArray <- createTParArray(tParCount = scbParams$tParCount)
+  scb$tvma1CoefArray <- createTVMA1CoefArray(sampleSize = scbParams$sampleSize)
+  scb$noise <- createNoise(sampleSize = scbParams$sampleSize,
+                           mean = scbParams$mean,
+                           sd = scbParams$sd)
+  scb$sample <- createSample(sampleSize = scbParams$sampleSize)
+  scb$k <- normalDifferenceKernel(u = scbParams$u)
+  scb$bwidth <- computeB(n = scbParams$sampleSize)
+  scb$multiplierCovarianceByKernel <-  createMultiplierCovarianceByKernel(kernel = scbParams$kernel,
+                                                                          bandwidth = scb$bwidth,
+                                                                          sampleSize = scbParams$sampleSize    )
+  scb$bootstrapMultiplier <- createBootstrapMultiplier(kernel = scbParams$kernel,
+                                                       bandwidth = scb$bwidth,
+                                                       sampleSize = scbParams$sampleSize)
+
+  scb$lagCount <-  computeLagCount(sampleSize = scbParams$sampleSize,
+                                   lag = scbParams$lag)
+  scb$covHat <- computeCovHat(tParArray = scb$tParArray,
+                              lag = scbParams$lag,
+                              sample = scb$sample,
+                              kernel = scbParams$kernel,
+                              bandwidth = scb$bwidth)
+  scb$corHat <- computeCorHat(tParArray = scb$tParArray,
+                              lag = scbParams$lag,
+                              sample = scb$sample,
+                              kernel = scbParams$kernel,
+                              bandwidth = scb$bwidth)
+  scb$allCorHats <- computeAllCorHats(tParArray = scb$tParArray,
+                                      lagCount = scb$lagCount,
+                                      sample = scb$sample,
+                                      kernel = scbParams$kernel,
+                                      bandwidth = scb$bwidth)
+  scb$betaLRVHat <- computeBetaLRVHat(tParArray = scb$tParArray,
+                                      lag = scbParams$lag,
+                                      sample = scb$sample,
+                                      kernel = scbParams$kernel,
+                                      bandwidth = scb$bwidth,
+                                      allCorHats = scb$allCorHats)
+  scb$corArray <- computeCor(lag = scbParams$lag,
+                             tParArray = scb$tParArray)
+  scb$me <- computeMEbyCovHat(tParArray = scb$tParArray,
+                              lag = scbParams$lag,
+                              lagCount = scb$lagCount,
+                              sample = scb$sample,
+                              kernel = normalDifferenceKernel,
+                              bandwidth = scb$bwidth,
+                              nonCoverageProbability = scbParams$nonCoverageProbability,
+                              allCorHats = scb$allCorHats,
+                              C_K = scbParams$c_k,
+                              PHI_K_NORMAL_DIFF = scbParams$phi_k_norm_diff)
+  scb$band <- createBand(scb$tParArray,
+                         scbParams$lag,
+                         scb$lagCount,
+                         scb$bwidth,
+                         kernel = normalDifferenceKernel,
+                         scbParams$sampleSize,
+                         scbParams$nonCoverageProbability)
+  scb$bandsBrick <- createBandsBrick(tParArray = scb$tParArray,
+                                     lag = scbParams$lag,
+                                     lagCount = scb$lagCount,
+                                     bandwidth = scb$bwidth,
+                                     kernel = normalDifferenceKernel,
+                                     sampleSize = scbParams$sampleSize,
+                                     nonCoverageProbability = scbParams$nonCoverageProbability,
+                                     replicationCount = scbParams$replicationCount)
+  scb$isCovered <- computeIsCovered(scb$band,
+                                    scb$corArray,
+                                    sampleSize = scbParams$sampleSize,
+                                    bandwidth = scb$bwidth,
+                                    lag = scbParams$lag,
+                                    replicationCount = scbParams$replicationCount,
+                                    superReplicationCount = scbParams$superReplicationCount)
+  scb$isCoveredArray <- computeIsCoveredArray(bandsBrick = scb$bandsBrick,
+                                              corArray = scb$corArray,
+                                              sampleSize = scbParams$sampleSize,
+                                              bandwidth = scb$bwidth,
+                                              lag = scbParams$lag,
+                                              replicationCount = scbParams$replicationCount,
+                                              superReplicationCount = scbParams$SuperReplicationCount)
+  scb$nonCoverageFreq <- computeNonCoverageFreq(replicationCount = scbParams$replicationCount,
+                                                sampleSize = scbParams$sampleSize,
+                                                lagCount = scb$lagCount,
+                                                lag = scbParams$lag,
+                                                tParArray = scb$tParArray,
+                                                corArray = scb$corArray,
+                                                kernel = scbParams$kernel,
+                                                bandwidth = scb$bwidth,
+                                                nonCoverageProbability = scbParams$nonCoverageProbability,
+                                                superReplicationCount = scbParams$superReplicationCount)
+  # scb$nonCoverageFreqArray <- computeNonCoverageFreqArray(superReplicationCount = scbParams$superReplicationCount,
+  #                                                         replicationCount = scbParams$replicationCount,
+  #                                                         sampleSize = scbParams$sample,
+  #                                                         lag = scbParams$lag,
+  #                                                         lagCount = scb$lagCount,
+  #                                                         tParArray = scb$tParArray,
+  #                                                         kernel = scbParams$kernel,
+  #                                                         bandwidth = scb$bwidth,
+  #                                                         nonCoverageProbability = scbParams$nonCoverageProbability)
+  # scb$doubleAlphaArray = createDoubleAlphaArray(superReplicationCount = scbParams$superReplicationCount,
+  #                                               replicationCount = scbParams$replicationCount,
+  #                                               sampleSize = scbParams$sampleSize,
+  #                                               # alphaArray =alphaArray,
+  #                                               lag = scbParams$lag,
+  #                                               lagCount = scb$lagCount,
+  #                                               tParArray = scb$tParArray,
+  #                                               kernel = scbParams$kernel,
+  #                                               bandwidth = scb$bwidth)
+  # saveBand(band = band,
+  #          corArray = corArray,
+  #          sampleSize = scbParams$sampleSize,
+  #          lag = scbParams$lag,
+  #          replicationCount = scbParams$replicationCount,
+  #          bandwidth = scb$bwidth,
+  #          superReplicationCount = scbParams$superReplicationCount)
+  #
+  # saveNonCoverageFreqArray(nonCoverageProbability = nonCoverageProbability,
+  #                          alphaHatArray = scb$isCoveredArray,
+  #                          sampleSize = scbParams$sampleSize,
+  #                          replicationCount = scbParams$replicationCount,
+  #                          bandwidth = scb$bwidth,
+  #                          lag = scbParams$lag,
+  #                          superReplicationCount = scbParams$superReplicationCount)
+  # saveDoubleAplhaHatArray(nonCoverageProbabilities = scbParams$nonCoverageProbabilities,
+  #                         alphaHats = alphaHats,
+  #                         sampleSize = scbParams$sampleSize,
+  #                         lag = scbParams$lag,
+  #                         replicationCount = scbParams$replicationCount,
+  #                         superReplicationCount = scbParams$superReplicationCount,
+  #                         bandwidth = scb$bwidth)
+
+  scb
+}
+
+scbList <- doAll(scbParams = scbParams)
+
+
+```
+
+Let's take a look at what we got
+```{r}
+scb
+```

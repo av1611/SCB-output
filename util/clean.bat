@@ -1,0 +1,1 @@
+FOR /R "..\" %%G IN (*.pdf) DO move "%%G" "..\output"

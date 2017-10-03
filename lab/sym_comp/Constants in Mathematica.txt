@@ -1,0 +1,14 @@
+Phi[x_] = 1 / ((2 * Pi) ^ (1 / 2)) * Exp[-(x ^ 2) / 2]
+
+K[x_] = 2 * Phi[x] - Phi[x / (2 ^ (1 / 2))] * 1 / (2 ^ (1 / 2))
+
+a = -6
+b = 6
+
+IntSqDer = N[Integrate[Abs[D[K[u], u]] ^ 2, {u, a, b}]]
+
+PhiKNormalDif = N[Integrate[K[u] ^ 2, {u, a, b}]]
+
+CK = 0.5 * Log[IntSqDer / (4 * (Pi ^ 2) * PhiKNormalDif)]
+
+# you can run it on http://develop.open.wolframcloud.com/app/ 
